@@ -1,0 +1,4 @@
+#wpbody.cool-nav-loading {
+    transition: opacity 0.2s ease;
+    opacity: 0.4;
+}
