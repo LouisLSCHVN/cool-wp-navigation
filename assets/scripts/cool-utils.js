@@ -9,6 +9,7 @@ export const SELECTORS = {
 
 const dontWorkYet = [
     "/wp-admin/site-editor.php",
+    "/wp-admin/post-new.php",
 ]
 
 export const isSafeUrl = (url) => {
@@ -31,7 +32,7 @@ export const showErrorMessage = (message) => {
     errorDiv.textContent = message;
     errorDiv.setAttribute('role', 'alert');
     document.querySelector(SELECTORS.WP_WRAP).insertAdjacentElement('afterbegin', errorDiv);
-    setTimeout(() => errorDiv.remove(), 5000);
+    setTimeout(() => errorDiv.remove(), 20000);
 };
 
 export const showNotification = (message) => {
@@ -40,7 +41,7 @@ export const showNotification = (message) => {
     notificationDiv.textContent = message;
     notificationDiv.setAttribute('role', 'status');
     document.querySelector(SELECTORS.WP_WRAP).insertAdjacentElement('afterbegin', notificationDiv);
-    setTimeout(() => notificationDiv.remove(), 10000);
+    setTimeout(() => notificationDiv.remove(), 20000);
 };
 
 export const updateTag = (currentDom, newDom) => {

@@ -1,7 +1,7 @@
 // Cache client side configuration
 const CACHE_CONFIG = {
-    MAX_SIZE: 10,
-    TTL: 1000 * 60 * 5,
+    MAX_SIZE: 100,
+    TTL: 1000 * 60 * 2,
     STORAGE_KEY: 'cool-wp-cache'
 };
 
@@ -40,6 +40,12 @@ export class CoolClientCache {
         this.cache.clear();
         this.saveToLocalStorage();
         console.log('Cache cleared');
+    }
+
+    clearSingle(url) {
+        this.cache.delete(url);
+        this.saveToLocalStorage();
+        console.log('Cache cleared for:', url);
     }
 
     getOldestCacheKey() {

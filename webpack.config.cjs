@@ -23,5 +23,16 @@ module.exports = {
                 }
             }
         ]
-    }
+    },
+    devServer: {
+        static: {
+            directory: path.join(__dirname, './assets/dist'),
+        },
+        devMiddleware: {
+            writeToDisk: true,
+        },
+        compress: true,
+        port: 9000,
+        hot: true,
+    },
 };

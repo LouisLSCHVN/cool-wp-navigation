@@ -1,39 +1,46 @@
 /**
  * TODO:
  * - [X] When no e.target.parentElement (in changeCurrentState) handle properly
- * - [ ] Vite app not working, they just don't start for some reasons ?? Handle that
  * - [X] Make a wpcontent specific handling for every link that is in wp-admin/
- * - [ ] Make a list of urls that just replace the html tag
- * - [ ] Make submit button ajax and notification handling
- * - [ ] Refactor code that repeats (setupNavigationForAdminMenu, setupNavigationForAdminContent)
- * - [ ] Add Cache Map
+ * - [X] Add Cache Map
  * - [X] Add Show Error Methods
  * - [X] Add is safeURL method
- * - [ ] Add roleback if this dosn't work
+ * - [X] Add roleback if this dosn't work
+ * - [ ] Vite app not working, they just don't start for some reasons ?? Handle that
+ * - [ ] Make a list of urls that just replace the html tag
+ * - [ ] Make submit button ajax and notification handling
+ * - [ ] Do the same for themes and add the clientCache with options
  */
 
 /** IMPORST **/
-import {showNotification, showErrorMessage, updateTag, isSafeUrl, SELECTORS} from './cool-utils.js';
+import { showNotification, showErrorMessage, updateTag, isSafeUrl, SELECTORS } from './cool-utils.js';
 import { CoolClientCache } from './cool-client-cache.js';
-import { resetVueApp, waitForScripts } from "./cool-scripts-handler.js";
+// import { resetVueApp, waitForScripts } from "./cool-scripts-handler.js";
 
 const clientCache = new CoolClientCache();
 
 document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
     listenToPopState();
+
+    window.history.replaceState({ path: window.location.href }, '', window.location.href);
 });
 
 export const setupNavigation = () => {
     setupNavigationForAdminMenu();
     setupNavigationForAdminContent();
-    setupSubmitButtons();
+
+    // Not ready yet
+    setupForm();
 };
 
-export const setupSubmitButtons = () => {
-    const submitButtons = document.querySelectorAll(SELECTORS.SUBMIT_BUTTONS);
-    submitButtons.forEach(button => button.addEventListener('click', handleSubmit));
-};
+const setupForm = () => {
+    const forms = document.querySelectorAll('form:not(.ajax-processed)')
+    forms.forEach(form => {
+        form.addEventListener('submit', handleSubmit);
+        form.classList.add('ajax-processed');
+    })
+}
 
 export const setupNavigationForAdminMenu = () => {
     const adminLinks = document.querySelectorAll(SELECTORS.ADMIN_LINKS);
@@ -72,30 +79,59 @@ const cacheOrFetch = async (url) => {
 
 const handleSubmit = async (e) => {
     e.preventDefault();
-    const form = e.target.closest('form');
-    if(!form) return
+    const form = e.target;
 
     const formData = new FormData(form);
+    formData.append('action', 'wp_admin_ajax_form_submit');
+    formData.append('nonce', wpAjaxFormsData.nonce);
+
+    form.classList.add('cool-nav-loading');
+
     try {
-        const response = await fetch(form.action, {
-            method: form.method,
-            body: formData
+        const response = await fetch(wpAjaxFormsData.ajaxurl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
         });
-        console.log("Response from form : ", response)
+        console.log("Response from form : ", response);
+
         if (!response.ok) throw new Error("Error submitting form!");
-        showNotification("Form submitted successfully!");
-        clientCache.clear()
+
+        // Lire le contenu de la réponse
+        const responseText = await response.text();
+        console.log("Response content:", responseText);
+
+        let responseData;
+        try {
+            responseData = JSON.parse(responseText);
+        } catch (error) {
+            console.log("Response is not JSON, using text content");
+            responseData = { success: true, data: { message: responseText } };
+        }
+
+        if (responseData.success) {
+            showNotification(responseData.data.message || "Form submitted successfully!");
+
+            if (responseData.data && responseData.data.redirect) {
+                const page = clientCache.get(responseData.data.redirect);
+                if (page) clientCache.clearSingle(responseData.data.redirect);
+                await navigate(responseData.data.redirect);
+            }
+        } else {
+            showErrorMessage(responseData.data.message || "An error occurred");
+        }
+
     } catch (error) {
+        console.error("Error:", error);
         showErrorMessage(error.message);
+    } finally {
+        form.classList.remove('cool-nav-loading');
     }
 };
-
 const navigate = async (url) => {
+    console.log('Navigating to:', url);
     const wpBody = document.querySelector(SELECTORS.WP_BODY);
     wpBody.classList.add('cool-nav-loading');
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     try {
         const html = await cacheOrFetch(url);
@@ -105,35 +141,30 @@ const navigate = async (url) => {
         const content = doc.querySelector(SELECTORS.WP_BODY);
         wpBody.innerHTML = content.innerHTML;
 
-        // Handling the head tags
         updateTag(document, doc);
-        // await waitForScripts();
-        //  resetVueApp();
-
         setupNavigationForAdminContent();
+        setupForm();
 
         wpBody.classList.remove('cool-nav-loading');
         console.log("Content updated with response from: ", url);
 
         window.history.pushState({ path: url }, '', url);
     } catch (error) {
-        throw error;
-    } finally {
-        clearTimeout(timeoutId);
+        console.error('Navigation error:', error);
+        wpBody.classList.remove('cool-nav-loading');
     }
 };
 
 const changeWpMenuState = (e) => {
-    console.log("Change WP Menu State", e.currentTarget);
-
     // Static classes
-    const MENU_TOP = 'menu-top';
+    const MENU_TOP = 'menu-top'
     const CURRENT = 'current';
     const WP_HAS_CURRENT_SUBMENU = 'wp-has-current-submenu';
     const WP_NOT_CURRENT_SUBMENU = 'wp-not-current-submenu';
 
     // Prevent double click
-    if (!e.currentTarget || e.currentTarget.classList.contains(CURRENT)) return;
+    if(!e.currentTarget) console.log("No current target");
+    if(e.currentTarget.classList.contains(CURRENT)) return;
 
     // Remove other styles
     const current = Array.from(document.getElementsByClassName(CURRENT));
@@ -145,29 +176,31 @@ const changeWpMenuState = (e) => {
         el.classList.add(WP_NOT_CURRENT_SUBMENU);
     });
 
-    let a, li, container, parentContainer;
+    // Add styles
+    const a = e.currentTarget.classList.contains(MENU_TOP)
+        ? e.currentTarget.parentNode.querySelector('ul li ul a')
+        : e.target.closest('a');
+    if(!a) return;
 
-    if (e.currentTarget.classList.contains(MENU_TOP)) {
-        a = e.currentTarget;
-        li = a.parentElement;
-        container = li;
-        parentContainer = container.parentElement;
-    } else return
+    const li = a.parentElement
+    const ul = li.parentElement
+    const container = ul.parentElement
+    const parentContainer = container.parentElement
 
-    if (a) a.classList.add(CURRENT);
-    if (li) li.classList.add(CURRENT);
+    a.classList.add(CURRENT)
+    li.classList.add(CURRENT)
 
-    if (container) {
-        container.classList.remove(WP_NOT_CURRENT_SUBMENU);
-        container.classList.add(WP_HAS_CURRENT_SUBMENU);
-    }
+    container.classList.remove(WP_NOT_CURRENT_SUBMENU)
+    container.classList.add(WP_HAS_CURRENT_SUBMENU)
 
-    if (parentContainer && parentContainer !== container) {
-        parentContainer.classList.remove(WP_NOT_CURRENT_SUBMENU);
-        parentContainer.classList.add(WP_HAS_CURRENT_SUBMENU);
-    }
+    parentContainer.classList.remove(WP_NOT_CURRENT_SUBMENU)
+    parentContainer.classList.add(WP_HAS_CURRENT_SUBMENU)
 }
 
 const listenToPopState = () => {
-    window.addEventListener('popstate', (event) => (event.state) ?? navigate(event.state.path));
+    window.addEventListener('popstate', (event) => {
+        if (event.state && event.state.path) {
+            navigate(event.state.path);
+        }
+    });
 }
