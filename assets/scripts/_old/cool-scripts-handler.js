@@ -1,8 +1,11 @@
+window.createApp = undefined;
 export const resetVueApp = () => {
     if (window.vueApp) {
         window.vueApp.$destroy();
         window.vueApp = null;
     }
+
+    const isVueApp = document.querySelector("data-v-app");
     if (window.createApp) {
         window.createApp();
     }

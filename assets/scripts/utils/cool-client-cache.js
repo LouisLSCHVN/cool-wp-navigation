@@ -1,11 +1,11 @@
 // Cache client side configuration
 const CACHE_CONFIG = {
     MAX_SIZE: 100,
-    TTL: 1000 * 60 * 2,
+    TTL: 1000 * 60 * 10,
     STORAGE_KEY: 'cool-wp-cache'
 };
 
-// Class to manage the cache
+// Class to manage cache (local storage)
 export class CoolClientCache {
     constructor() {
         this.cache = new Map();
@@ -81,4 +81,15 @@ export class CoolClientCache {
             }
         }
     }
+    async cacheOrFetch(url) {
+        const cachedHtml = this.get(url);
+        if (cachedHtml) {
+            return cachedHtml;
+        }
+
+        const response = await fetch(url);
+        const html = await response.text();
+        this.set(url, html);
+        return html;
+    };
 }

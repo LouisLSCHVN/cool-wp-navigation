@@ -2,3 +2,35 @@
     transition: opacity 0.2s ease;
     opacity: 0.4;
 }
+
+:root {
+    --transition-time-opacity: 0.3s;
+    --transition-time-regular: 0.4s;
+}
+
+.wp-admin #adminmenuwrap li:not(.opensub) .wp-submenu.wp-submenu-wrap {
+    transform: translateY(-10px);
+    transition: max-height var(--transition-time-regular) ease,
+    opacity var(--transition-time-opacity) ease-out,
+    padding var(--transition-time-regular) ease-out,
+    transform var(--transition-time-regular) ease-out;
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+}
+
+.wp-admin #adminmenuwrap li.wp-has-current-submenu .wp-submenu.wp-submenu-wrap,
+.wp-admin #adminmenuwrap li.opensub .wp-submenu.wp-submenu-wrap {
+    transition: max-height var(--transition-time-regular) ease,
+    opacity var(--transition-time-opacity) ease-out,
+    padding var(--transition-time-regular) ease-out;
+    transform: translateY(0);
+    overflow: hidden;
+    overflow-wrap: break-word;
+    max-height: 1000px;
+    opacity: 1;
+    padding-top: 7px;
+    padding-bottom: 8px;
+}
